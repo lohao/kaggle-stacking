@@ -38,21 +38,19 @@ def main():
     # Some useful parameters which will come in handy later on
     rf = helper.SklearnHelper(clf=RandomForestClassifier, seed=SEED, params=config.rf_params)
     et = helper.SklearnHelper(clf=ExtraTreesClassifier, seed=SEED, params=config.et_params)
-    # ada = helper.SklearnHelper(clf=AdaBoostClassifier, seed=SEED, params=config.ada_params)
     lr = helper.SklearnHelper(clf=LogisticRegression, seed=SEED, params=config.lr_params)
     gb = helper.SklearnHelper(clf=GradientBoostingClassifier, seed=SEED, params=config.gb_params)
     svc = helper.SklearnHelper(clf=SVC, seed=SEED, params=config.svc_params)
 
     y_train = train_df['Survived'].ravel()
     train_df = train_df.drop(['Survived'], axis=1)
-    x_train = pd.get_dummies(train_df).values
-    x_test = pd.get_dummies(test_df).values
+    x_train = train_df.values
+    x_test = test_df.values
 
     # Create our OOF train and test predictions. These base results will be used as new features
     et_oof_train, et_oof_test = helper.get_oof(et, x_train, y_train, x_test)  # Extra Trees
     rf_oof_train, rf_oof_test = helper.get_oof(rf, x_train, y_train, x_test)  # Random Forest
-    # ada_oof_train, ada_oof_test = helper.get_oof(ada, x_train, y_train, x_test)  # AdaBoost
-    lr_oof_train, lr_oof_test = helper.get_oof(lr, x_train, y_train, x_test)  # AdaBoost
+    lr_oof_train, lr_oof_test = helper.get_oof(lr, x_train, y_train, x_test)  # lr
     gb_oof_train, gb_oof_test = helper.get_oof(gb, x_train, y_train, x_test)  # Gradient Boost
     svc_oof_train, svc_oof_test = helper.get_oof(svc, x_train, y_train, x_test)  # Support Vector Classifier
 
@@ -76,8 +74,6 @@ def main():
     print("rf Accuracy: {}".format(scores))
     scores = cross_val_score(et.clf, x_train, y_train, cv=5)
     print("et Accuracy: {}".format(scores))
-    # scores = cross_val_score(ada.clf, x_train, y_train, cv=5)
-    # print("ada Accuracy: {}".format(scores))
     scores = cross_val_score(lr.clf, x_train, y_train, cv=5)
     print("lr Accuracy: {}".format(scores))
     scores = cross_val_score(gb.clf, x_train, y_train, cv=5)
@@ -127,8 +123,7 @@ def fea_eng(train, test):
         dataset['Title'] = dataset['Name'].apply(get_title)
     # Group all non-common titles into one single grouping "Rare"
     for dataset in combine:
-        dataset['Title'] = dataset['Title'].replace(
-            ['Lady', 'Countess', 'Capt', 'Col', 'Dona', 'Dr', 'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
+        dataset['Title'] = dataset['Title'].replace(['Lady', 'Countess', 'Capt', 'Col', 'Dona', 'Dr', 'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
 
         dataset['Title'] = dataset['Title'].replace('Mlle', 'Miss')
         dataset['Title'] = dataset['Title'].replace('Ms', 'Miss')
@@ -137,7 +132,8 @@ def fea_eng(train, test):
         # Mapping titles
         title_mapping = {"Mr": 1, "Miss": 2, "Mrs": 3, "Master": 4, "Rare": 5}
         dataset['Title'] = dataset['Title'].map(title_mapping)
-        dataset['Title'] = dataset['Title'].fillna(0)
+        dataset['Title'] = dataset['Title'].fillna(0).astype(int)
+
 
     #根据Title对应的年龄均值作为填充值
     title_age_dict = combine[0].groupby('Title').Age.mean().to_dict()
@@ -145,12 +141,13 @@ def fea_eng(train, test):
         age_null_list = dataset.loc[np.isnan(dataset['Age']), 'Title'].apply(lambda x: title_age_dict[x])
         dataset.loc[np.isnan(dataset['Age']), 'Age'] = age_null_list
 
-    train['CategoricalAge'] = pd.cut(train['Age'], 5)
 
-    #选择使用均值填充null值
-    # Remove all NULLS in the Fare column and create a new feature CategoricalFare
     for dataset in combine:
-        dataset['Fare'] = dataset['Fare'].fillna(train['Fare'].median())
+        dataset['child'] = (dataset['Age'] < 12).astype(int)
+        dataset['mother'] = ((dataset['Title'] == 3) & (dataset['Parch'] >= 1)).astype(int)
+        dataset['Fare'] = dataset.fillna(dataset['Fare'].mode()[0])
+
+    train['CategoricalAge'] = pd.cut(train['Age'], 5)
 
     train['CategoricalFare'] = pd.qcut(train['Fare'], 4)
     # Create a New feature CategoricalAge
@@ -170,7 +167,7 @@ def fea_eng(train, test):
         # Mapping Embarked
         dataset['Embarked'] = dataset['Embarked'].map({'S': 0, 'C': 1, 'Q': 2}).astype(int)
 
-        dataset = helper.get_onehot(dataset, ['Embarked', 'Sex'])
+        # dataset = helper.get_onehot(dataset, ['Sex'])
 
         # Mapping Fare
         dataset.loc[dataset['Fare'] <= 7.91, 'Fare'] = 0
@@ -187,7 +184,7 @@ def fea_eng(train, test):
         dataset.loc[dataset['Age'] > 64, 'Age'] = 4
 
         # Feature selection
-    drop_elements = ['PassengerId', 'Name', 'Ticket', 'Cabin', 'SibSp', 'Embarked', 'Sex']
+    drop_elements = ['PassengerId', 'Name', 'Ticket', 'Cabin', 'SibSp']
     train = train.drop(drop_elements, axis=1)
     train = train.drop(['CategoricalAge', 'CategoricalFare'], axis=1)
     test = test.drop(drop_elements, axis=1)
