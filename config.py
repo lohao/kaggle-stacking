@@ -2,11 +2,11 @@
 # Random Forest parameters
 rf_params = {
     'n_jobs': -1,
-    'n_estimators': 50,
+    'n_estimators': 110,
      # 'warm_start': True,
      #'max_features': 0.2,
-    'max_depth': 6,
-    'min_samples_leaf': 2,
+    'max_depth': 5,
+    'min_samples_split': 2,
     'max_features': 'sqrt',
     'verbose': 0,
 }

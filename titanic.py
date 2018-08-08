@@ -10,7 +10,7 @@ from sklearn.ensemble import (RandomForestClassifier, AdaBoostClassifier,
 from sklearn.linear_model import LogisticRegression
 
 from sklearn.svm import SVC
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, GridSearchCV
 
 import helper
 import config
@@ -46,6 +46,20 @@ def main():
     train_df = train_df.drop(['Survived'], axis=1)
     x_train = train_df.values
     x_test = test_df.values
+
+    #网格搜索示例
+    rf_params = {'n_estimators': np.arange(30, 200, 20),
+                 'max_depth': np.arange(5, 10),
+                 'min_samples_split': np.arange(2, 5)
+                 }
+
+
+    rf_clf = GridSearchCV(estimator=RandomForestClassifier(), param_grid=rf_params, scoring='accuracy', cv=10)
+    rf_clf.fit(X=x_train, y=y_train)
+
+    print(rf_clf.best_params_)
+
+
 
     # Create our OOF train and test predictions. These base results will be used as new features
     et_oof_train, et_oof_test = helper.get_oof(et, x_train, y_train, x_test)  # Extra Trees
@@ -182,6 +196,8 @@ def fea_eng(train, test):
         dataset.loc[(dataset['Age'] > 32) & (dataset['Age'] <= 48), 'Age'] = 2
         dataset.loc[(dataset['Age'] > 48) & (dataset['Age'] <= 64), 'Age'] = 3
         dataset.loc[dataset['Age'] > 64, 'Age'] = 4
+
+        dataset['sex_pclass'] = dataset['Sex'] * dataset['Pclass']
 
         # Feature selection
     drop_elements = ['PassengerId', 'Name', 'Ticket', 'Cabin', 'SibSp']
