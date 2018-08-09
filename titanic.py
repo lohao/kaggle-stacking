@@ -10,63 +10,57 @@ from sklearn.ensemble import (RandomForestClassifier, AdaBoostClassifier,
 from sklearn.linear_model import LogisticRegression
 
 from sklearn.svm import SVC
-from sklearn.model_selection import cross_val_score, GridSearchCV
+from sklearn.model_selection import cross_val_score
 
 import helper
 import config
 
 import warnings
+
 warnings.filterwarnings(module='sklearn*', action='ignore', category=DeprecationWarning)
 
 SEED = 0
 
 
 def main():
-
-    #['PassengerId', 'Survived', 'Pclass', 'Name', 'Sex', 'Age', 'SibSp', 'Parch', 'Ticket', 'Fare', 'Cabin', 'Embarked']
+    # ['PassengerId', 'Survived', 'Pclass', 'Name', 'Sex', 'Age', 'SibSp', 'Parch', 'Ticket', 'Fare', 'Cabin', 'Embarked']
     train_df_ori = pd.read_csv('data/train.csv')
     test_df_ori = pd.read_csv('data/test.csv')
 
     train_df, test_df = fea_eng(train_df_ori, test_df_ori)
 
-    # colormap = plt.cm.RdBu
-    # plt.figure(figsize=(14, 12))
-    # plt.title('Pearson Correlation of Features', y=1.05, size=15)
-    # sns.heatmap(train_df.astype(float).corr(), linewidths=0.1, vmax=1.0, square=True, cmap=colormap, linecolor='white', annot=True)
-    # plt.show()
+    colormap = plt.cm.RdBu
+    plt.figure(figsize=(14, 12))
+    sns.heatmap(train_df.astype(float).corr(), linewidths=0.1, vmax=1.0, square=True, cmap=colormap, linecolor='white',
+                annot=True)
+    plt.title('Pearson Correlation of Features', y=1.05, size=15)
+    plt.show()
 
     # Some useful parameters which will come in handy later on
     rf = helper.SklearnHelper(clf=RandomForestClassifier, seed=SEED, params=config.rf_params)
     et = helper.SklearnHelper(clf=ExtraTreesClassifier, seed=SEED, params=config.et_params)
     lr = helper.SklearnHelper(clf=LogisticRegression, seed=SEED, params=config.lr_params)
     gb = helper.SklearnHelper(clf=GradientBoostingClassifier, seed=SEED, params=config.gb_params)
-    svc = helper.SklearnHelper(clf=SVC, seed=SEED, params=config.svc_params)
+    # svc = helper.SklearnHelper(clf=SVC, seed=SEED, params=config.svc_params)
 
     y_train = train_df['Survived'].ravel()
     train_df = train_df.drop(['Survived'], axis=1)
     x_train = train_df.values
     x_test = test_df.values
 
-    #网格搜索示例
-    rf_params = {'n_estimators': np.arange(30, 200, 20),
-                 'max_depth': np.arange(5, 10),
-                 'min_samples_split': np.arange(2, 5)
-                 }
-
-
-    rf_clf = GridSearchCV(estimator=RandomForestClassifier(), param_grid=rf_params, scoring='accuracy', cv=10)
-    rf_clf.fit(X=x_train, y=y_train)
-
-    print(rf_clf.best_params_)
-
-
+    # 网格搜索，寻找最优参数
+    helper.GridSearchThread(clf=RandomForestClassifier(), params=config.rf_grid_params, X=x_train, y=y_train).start()
+    helper.GridSearchThread(clf=ExtraTreesClassifier(), params=config.et_grid_params, X=x_train, y=y_train).start()
+    helper.GridSearchThread(clf=LogisticRegression(), params=config.lr_grid_params, X=x_train, y=y_train).start()
+    helper.GridSearchThread(clf=GradientBoostingClassifier(), params=config.gb_grid_params, X=x_train,
+                            y=y_train).start()
 
     # Create our OOF train and test predictions. These base results will be used as new features
     et_oof_train, et_oof_test = helper.get_oof(et, x_train, y_train, x_test)  # Extra Trees
     rf_oof_train, rf_oof_test = helper.get_oof(rf, x_train, y_train, x_test)  # Random Forest
     lr_oof_train, lr_oof_test = helper.get_oof(lr, x_train, y_train, x_test)  # lr
     gb_oof_train, gb_oof_test = helper.get_oof(gb, x_train, y_train, x_test)  # Gradient Boost
-    svc_oof_train, svc_oof_test = helper.get_oof(svc, x_train, y_train, x_test)  # Support Vector Classifier
+    # svc_oof_train, svc_oof_test = helper.get_oof(svc, x_train, y_train, x_test)  # Support Vector Classifier
 
     print("Training is complete")
 
@@ -76,8 +70,8 @@ def main():
                                            'GradientBoost': gb_oof_train.ravel()
                                            })
 
-    x_train = np.concatenate((et_oof_train, rf_oof_train, lr_oof_train, gb_oof_train, svc_oof_train), axis=1)
-    x_test = np.concatenate((et_oof_test, rf_oof_test, lr_oof_test, gb_oof_test, svc_oof_test), axis=1)
+    x_train = np.concatenate((et_oof_train, rf_oof_train, lr_oof_train, gb_oof_train), axis=1)
+    x_test = np.concatenate((et_oof_test, rf_oof_test, lr_oof_test, gb_oof_test), axis=1)
 
     xgb_helper = helper.SklearnHelper(clf=xgb.XGBClassifier, seed=SEED, params=config.xgb_params)
     xgb_helper.train(x_train, y_train)
@@ -92,12 +86,13 @@ def main():
     print("lr Accuracy: {}".format(scores))
     scores = cross_val_score(gb.clf, x_train, y_train, cv=5)
     print("gb Accuracy: {}".format(scores))
-    scores = cross_val_score(svc.clf, x_train, y_train, cv=5)
-    print("svc Accuracy: {}".format(scores))
+    # scores = cross_val_score(svc.clf, x_train, y_train, cv=5)
+    # print("svc Accuracy: {}".format(scores))
     scores = cross_val_score(xgb_helper.clf, x_train, y_train, cv=5)
     print("stacking xgb Accuracy: {}".format(scores))
 
-    helper.plot_learning_curve(xgb_helper.clf, 'learn curve', x_train, y_train)
+    helper.plot_learning_curve(xgb_helper.clf, 'xgb_learn curve', x_train, y_train)
+    helper.plot_learning_curve(rf.clf, 'rf_learn curve', x_train, y_train)
 
     result = pd.DataFrame({"PassengerId": test_df_ori['PassengerId'],
                            "Survived": predictions
@@ -109,23 +104,23 @@ def main():
 def fea_eng(train, test):
     combine = [train, test]
 
-    #根据是否有舱位作为一个特征
+    # 根据是否有舱位作为一个特征
     for data in combine:
         data['Has_Cabin'] = data['Cabin'].apply(lambda x: 0 if x is not np.nan else 1)
 
-    #将家庭人数做为一个特征
+    # 将家庭人数做为一个特征
     # Feature engineering steps taken from Sina
     # Create new feature FamilySize as a combination of SibSp and Parch
     for dataset in combine:
         dataset['FamilySize'] = dataset['SibSp'] + dataset['Parch'] + 1
 
-    #是否单身作为一个特征
+    # 是否单身作为一个特征
     # Create new feature IsAlone from FamilySize
     for dataset in combine:
         dataset['IsAlone'] = 0
         dataset.loc[dataset['FamilySize'] == 1, 'IsAlone'] = 1
 
-    #选择最多的岸口填充null值
+    # 选择最多的岸口填充null值
     # Remove all NULLS in the Embarked column
     for dataset in combine:
         dataset['Embarked'] = dataset['Embarked'].fillna(dataset['Embarked'].mode()[0])
@@ -137,7 +132,8 @@ def fea_eng(train, test):
         dataset['Title'] = dataset['Name'].apply(get_title)
     # Group all non-common titles into one single grouping "Rare"
     for dataset in combine:
-        dataset['Title'] = dataset['Title'].replace(['Lady', 'Countess', 'Capt', 'Col', 'Dona', 'Dr', 'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
+        dataset['Title'] = dataset['Title'].replace(
+            ['Lady', 'Countess', 'Capt', 'Col', 'Dona', 'Dr', 'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
 
         dataset['Title'] = dataset['Title'].replace('Mlle', 'Miss')
         dataset['Title'] = dataset['Title'].replace('Ms', 'Miss')
@@ -148,13 +144,11 @@ def fea_eng(train, test):
         dataset['Title'] = dataset['Title'].map(title_mapping)
         dataset['Title'] = dataset['Title'].fillna(0).astype(int)
 
-
-    #根据Title对应的年龄均值作为填充值
+    # 根据Title对应的年龄均值作为填充值
     title_age_dict = combine[0].groupby('Title').Age.mean().to_dict()
     for dataset in combine:
         age_null_list = dataset.loc[np.isnan(dataset['Age']), 'Title'].apply(lambda x: title_age_dict[x])
         dataset.loc[np.isnan(dataset['Age']), 'Age'] = age_null_list
-
 
     for dataset in combine:
         dataset['child'] = (dataset['Age'] < 12).astype(int)
@@ -172,7 +166,6 @@ def fea_eng(train, test):
     #     age_null_random_list = np.random.randint(age_avg - age_std, age_avg + age_std, size=age_null_count)
     #     dataset.loc[np.isnan(dataset['Age']), 'Age'] = age_null_random_list
     #     dataset['Age'] = dataset['Age'].astype(int)
-
 
     for dataset in combine:
         # Mapping Sex

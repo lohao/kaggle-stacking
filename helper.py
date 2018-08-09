@@ -1,6 +1,8 @@
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, GridSearchCV
 import numpy as np
 import pandas as pd
+import threading
+import time
 
 
 class SklearnHelper(object):
@@ -20,6 +22,28 @@ class SklearnHelper(object):
     def feature_importances(self, x, y):
         return self.clf.fit(x, y).feature_importances_
 
+
+class GridSearchThread(threading.Thread):
+    def __init__(self, clf, params, X, y):
+        threading.Thread.__init__(self)
+        self.clf = clf
+        self.params = params
+        self.X = X
+        self.y = y
+
+    def run(self):
+        import warnings
+        warnings.filterwarnings(module='sklearn*', action='ignore', category=DeprecationWarning)
+
+        start_time = time.time()
+
+        grid_clf = GridSearchCV(estimator=self.clf, param_grid=self.params, cv=5)
+
+        grid_clf.fit(self.X, self.y)
+
+        print(grid_clf.best_params_)
+        print('{} spend time is {}s'.format(str(self.clf).split('(')[0], (time.time()-start_time)))
+        print('='*40)
 
 def get_oof(clf, x_train, y_train, x_test):
     """获取stacking第二层训练器的输入数据"""
