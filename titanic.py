@@ -77,6 +77,9 @@ def main():
     xgb_helper.train(x_train, y_train)
     predictions = xgb_helper.predict(x_test)
 
+    helper.create_feature_map(train_df.columns)
+    xgb.plot_tree(xgb_helper.clf, fmap='xgb.fmap', num_trees=0)
+
     # 交叉验证，可以快速得到模型的预测正确率
     scores = cross_val_score(rf.clf, x_train, y_train, cv=5)
     print("rf Accuracy: {}".format(scores))

@@ -178,6 +178,14 @@ def fix_columns(d, columns):
     return d
 
 
+def create_feature_map(features):
+    outfile = open('xgb.fmap', 'w')
+    i = 0
+    for feat in features:
+        outfile.write('{0}\t{1}\tq\n'.format(i, feat))
+        i = i + 1
+    outfile.close()
+
 if __name__ == '__main__':
     n_cols = 4
     n_rows = 5

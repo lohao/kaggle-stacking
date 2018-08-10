@@ -1,0 +1,13 @@
+0	Pclass	q
+1	Sex	q
+2	Age	q
+3	Parch	q
+4	Fare	q
+5	Embarked	q
+6	Has_Cabin	q
+7	FamilySize	q
+8	IsAlone	q
+9	Title	q
+10	child	q
+11	mother	q
+12	sex_pclass	q
