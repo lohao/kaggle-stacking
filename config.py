@@ -69,10 +69,9 @@ gb_params = {
 
 gb_grid_params = {
     'n_estimators': np.arange(50, 200, 20),
-    'learning_rate': [0.001, 0.01, 0.1, 1, 10, 100, 1000],
-    'max_depth': np.arange(10, 100, 10),
+    'learning_rate': [0.01, 0.1],
+    'max_depth': np.arange(2, 10),
     'min_samples_split': np.arange(2, 5)
-
 }
 
 # Support Vector Classifier parameters
@@ -93,4 +92,9 @@ xgb_params = {
     'objective': 'binary:logistic',
     'nthread': -1,
     'scale_pos_weight': 1
+}
+
+xgb_grid_params = {
+    'subsample':[i/10.0 for i in range(6,10)],
+    'colsample_bytree':[i/10.0 for i in range(6,10)]
 }

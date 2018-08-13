@@ -1,8 +1,8 @@
 from sklearn.model_selection import KFold, GridSearchCV
 import numpy as np
 import pandas as pd
-import threading
 import time
+import multiprocessing as mp
 
 
 class SklearnHelper(object):
@@ -23,27 +23,31 @@ class SklearnHelper(object):
         return self.clf.fit(x, y).feature_importances_
 
 
-class GridSearchThread(threading.Thread):
-    def __init__(self, clf, params, X, y):
-        threading.Thread.__init__(self)
-        self.clf = clf
-        self.params = params
-        self.X = X
-        self.y = y
+def process_build(clf, params, X, y):
+    import warnings
+    warnings.filterwarnings(module='sklearn*', action='ignore', category=DeprecationWarning)
 
-    def run(self):
-        import warnings
-        warnings.filterwarnings(module='sklearn*', action='ignore', category=DeprecationWarning)
+    start_time = time.time()
 
-        start_time = time.time()
+    grid_clf = GridSearchCV(estimator=clf, param_grid=params, cv=5)
 
-        grid_clf = GridSearchCV(estimator=self.clf, param_grid=self.params, cv=5)
+    grid_clf.fit(X, y)
 
-        grid_clf.fit(self.X, self.y)
+    print(grid_clf.best_params_)
+    print('{} spend time is {}s'.format(str(clf).split('(')[0], (time.time() - start_time)))
+    print('=' * 40)
 
-        print(grid_clf.best_params_)
-        print('{} spend time is {}s'.format(str(self.clf).split('(')[0], (time.time()-start_time)))
-        print('='*40)
+
+class GridSearchProcessing(object):
+    def __init__(self, num_of_pool):
+        self.pool = mp.Pool(num_of_pool)
+
+    def start(self, clf, params, x, y):
+        self.pool.apply_async(func=process_build, args=(clf, params, x, y))
+
+    def get_pool(self):
+        return self.pool
+
 
 def get_oof(clf, x_train, y_train, x_test):
     """获取stacking第二层训练器的输入数据"""
@@ -163,7 +167,7 @@ def add_missing_dummy_columns(d, columns):
         d[c] = 0
 
 
-#增加和column一样的到test数据中，多余的column为0
+# 增加和column一样的到test数据中，多余的column为0
 def fix_columns(d, columns):
     add_missing_dummy_columns(d, columns)
 
@@ -185,6 +189,7 @@ def create_feature_map(features):
         outfile.write('{0}\t{1}\tq\n'.format(i, feat))
         i = i + 1
     outfile.close()
+
 
 if __name__ == '__main__':
     n_cols = 4

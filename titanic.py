@@ -8,9 +8,8 @@ import matplotlib.pyplot as plt
 from sklearn.ensemble import (RandomForestClassifier, AdaBoostClassifier,
                               GradientBoostingClassifier, ExtraTreesClassifier)
 from sklearn.linear_model import LogisticRegression
-
-from sklearn.svm import SVC
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, GridSearchCV, train_test_split
+from sklearn.metrics import *
 
 import helper
 import config
@@ -29,12 +28,12 @@ def main():
 
     train_df, test_df = fea_eng(train_df_ori, test_df_ori)
 
-    colormap = plt.cm.RdBu
-    plt.figure(figsize=(14, 12))
-    sns.heatmap(train_df.astype(float).corr(), linewidths=0.1, vmax=1.0, square=True, cmap=colormap, linecolor='white',
-                annot=True)
-    plt.title('Pearson Correlation of Features', y=1.05, size=15)
-    plt.show()
+    # colormap = plt.cm.RdBu
+    # plt.figure(figsize=(14, 12))
+    # sns.heatmap(train_df.astype(float).corr(), linewidths=0.1, vmax=1.0, square=True, cmap=colormap, linecolor='white',
+    #             annot=True)
+    # plt.title('Pearson Correlation of Features', y=1.05, size=15)
+    # plt.show()
 
     # Some useful parameters which will come in handy later on
     rf = helper.SklearnHelper(clf=RandomForestClassifier, seed=SEED, params=config.rf_params)
@@ -48,12 +47,53 @@ def main():
     x_train = train_df.values
     x_test = test_df.values
 
-    # 网格搜索，寻找最优参数
-    helper.GridSearchThread(clf=RandomForestClassifier(), params=config.rf_grid_params, X=x_train, y=y_train).start()
-    helper.GridSearchThread(clf=ExtraTreesClassifier(), params=config.et_grid_params, X=x_train, y=y_train).start()
-    helper.GridSearchThread(clf=LogisticRegression(), params=config.lr_grid_params, X=x_train, y=y_train).start()
-    helper.GridSearchThread(clf=GradientBoostingClassifier(), params=config.gb_grid_params, X=x_train,
-                            y=y_train).start()
+    # # 对XGBoost进行网格搜索
+    # x_train, x_test, y_train, y_test = train_test_split(x_train, y_train, test_size=0.2, random_state=SEED)
+    #
+    # xgb_grid = GridSearchCV(estimator=xgb.XGBClassifier(n_estimators=102,
+    #                                                     learning_rate=0.01,
+    #                                                     objective='binary:logistic',
+    #                                                     max_depth=2,
+    #                                                     min_child_weight=1,
+    #                                                     gamma=0,
+    #                                                     subsample=0.8,
+    #                                                     colsample_bytree=0.9,
+    #                                                     seed=SEED),
+    #                         param_grid=config.xgb_grid_params,
+    #                         cv=5)
+    # xgb_grid.fit(X=x_train, y=y_train)
+    # y_scores = xgb_grid.predict(x_test)
+    # # Print model report:
+    # print("Model Report")
+    # print('best parameter:' + str(xgb_grid.best_params_))
+    # print("Accuracy : {}".format(accuracy_score(y_true=y_test, y_pred=y_scores)))
+    # print("AUC Score (Test): {}".format(roc_auc_score(y_true=y_test, y_score=y_scores)))
+    #
+    # feat_imp = pd.Series(xgb_grid.best_estimator_.feature_importances_, index=train_df.columns.values).sort_values(ascending=False)
+    # feat_imp.plot(kind='bar', title='Feature Importances')
+    # plt.ylabel('Feature Importance Score')
+    # plt.show()
+
+    # # 网格搜索，寻找最优参数
+    # helper.GridSearchProcessing(helper.process_build(clf=RandomForestClassifier(),
+    #                                                  params=config.rf_grid_params,
+    #                                                  X=x_train,
+    #                                                  y=y_train))
+    # helper.GridSearchProcessing(helper.process_build(clf=ExtraTreesClassifier(),
+    #                                                  params=config.et_grid_params,
+    #                                                  X=x_train,
+    #                                                  y=y_train))
+    # helper.GridSearchProcessing(helper.process_build(clf=LogisticRegression(),
+    #                                                  params=config.lr_grid_params,
+    #                                                  X=x_train,
+    #                                                  y=y_train))
+    # process = helper.GridSearchProcessing(helper.process_build(clf=GradientBoostingClassifier(),
+    #                                                  params=config.gb_grid_params,
+    #                                                  X=x_train,
+    #                                                  y=y_train))
+    # # 对Pool对象调用join()方法会等待所有子进程执行完毕，调用join()之前必须先调用close()，调用close()之后就不能继续添加新的Process了
+    # process.get_pool().close()
+    # process.get_pool().join()
 
     # Create our OOF train and test predictions. These base results will be used as new features
     et_oof_train, et_oof_test = helper.get_oof(et, x_train, y_train, x_test)  # Extra Trees
@@ -61,6 +101,23 @@ def main():
     lr_oof_train, lr_oof_test = helper.get_oof(lr, x_train, y_train, x_test)  # lr
     gb_oof_train, gb_oof_test = helper.get_oof(gb, x_train, y_train, x_test)  # Gradient Boost
     # svc_oof_train, svc_oof_test = helper.get_oof(svc, x_train, y_train, x_test)  # Support Vector Classifier
+
+    plt.figure(figsize=(10,8))
+
+    plt.subplot(2,2,1)
+    rf_feature_importances = pd.Series(rf.clf.feature_importances_, index=train_df.columns.values).sort_values(ascending=False)
+    rf_feature_importances.plot(kind='bar', title='Feature Importances')
+    plt.ylabel('rf Feature Importance Score')
+
+    plt.subplot(2,2,2)
+    et_feature_importances = pd.Series(et.clf.feature_importances_, index=train_df.columns.values).sort_values(ascending=False)
+    et_feature_importances.plot(kind='bar', title='Feature Importances')
+    plt.ylabel('et Feature Importance Score')
+    plt.subplot(2,2,3)
+    gb_feature_importances = pd.Series(gb.clf.feature_importances_, index=train_df.columns.values).sort_values(ascending=False)
+    gb_feature_importances.plot(kind='bar', title='Feature Importances')
+    plt.ylabel('gb Feature Importance Score')
+    plt.show()
 
     print("Training is complete")
 
